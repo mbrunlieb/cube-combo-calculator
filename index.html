@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MTG Combo Probability Calculator</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -165,6 +165,31 @@
                                  comboSize === 3 ? [copiesA, copiesB, copiesC] :
                                  [copiesA, copiesB, copiesC, copiesD];
             const currentProb = calculateComboProb(cardsDrawn, currentPieces);
+
+            // Check if Recharts loaded properly
+            if (typeof Recharts === 'undefined') {
+                return (
+                    <div className="p-6 max-w-6xl mx-auto bg-gray-50 min-h-screen">
+                        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
+                            MTG Combo Probability Calculator
+                        </h1>
+                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                            <strong>Loading Error:</strong> Charts library failed to load. Please refresh the page.
+                        </div>
+                        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                            <h2 className="text-xl font-semibold mb-4">Current Scenario (Text Mode)</h2>
+                            <div className="text-center">
+                                <div className="text-3xl font-bold text-blue-600 mb-2">
+                                    {(currentProb * 100).toFixed(1)}%
+                                </div>
+                                <div className="text-gray-600">
+                                    Probability of drawing all {comboSize} combo pieces
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
                 <div className="p-6 max-w-6xl mx-auto bg-gray-50 min-h-screen">
