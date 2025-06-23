@@ -27,6 +27,8 @@
             const [copiesB, setCopiesB] = useState(1);
             const [copiesC, setCopiesC] = useState(1);
             const [copiesD, setCopiesD] = useState(1);
+            const [mulliganThreshold, setMulliganThreshold] = useState(20);
+            const [drawsAfterMulligan, setDrawsAfterMulligan] = useState(6);
 
             // Hypergeometric probability: P(X >= k) where X is successes in n draws from population N with K successes
             const hypergeometric = (N, K, n, k) => {
@@ -163,6 +165,76 @@
                     probability: (calculateComboProb(cardsDrawn, scenario.pieces) * 100).toFixed(1)
                 }));
             }, [cardsDrawn, comboSize]);
+
+            // Calculate mulligan scenarios
+            const mulliganData = useMemo(() => {
+                const pieces = comboSize === 2 ? [copiesA, copiesB] : 
+                               comboSize === 3 ? [copiesA, copiesB, copiesC] :
+                               [copiesA, copiesB, copiesC, copiesD];
+                
+                // Calculate probability of having combo in opening 7 cards
+                const openingProb = calculateComboProb(7, pieces) * 100;
+                
+                // Calculate expected probability with mulligan strategy
+                const calculateMulliganExpectedValue = () => {
+                    let expectedValue = 0;
+                    let remainingProbability = 1;
+                    
+                    // Check each mulligan scenario
+                    for (let mulligans = 0; mulligans <= 3; mulligans++) {
+                        const handSize = 7 - mulligans;
+                        if (handSize < 4) break; // Stop at unreasonably small hands
+                        
+                        // Probability of combo in this hand size + draws
+                        const totalCards = handSize + drawsAfterMulligan;
+                        const handProb = calculateComboProb(totalCards, pieces) * 100;
+                        
+                        if (mulligans === 0) {
+                            // First hand - keep if above threshold
+                            if (openingProb >= mulliganThreshold) {
+                                expectedValue += remainingProbability * handProb;
+                                remainingProbability = 0;
+                                break;
+                            } else {
+                                // Mulligan - probability we don't keep this hand
+                                remainingProbability *= (100 - openingProb) / 100;
+                            }
+                        } else {
+                            // Subsequent hands - simplified model
+                            if (handProb >= mulliganThreshold || mulligans === 3) {
+                                expectedValue += remainingProbability * handProb;
+                                break;
+                            } else {
+                                remainingProbability *= (100 - handProb) / 100;
+                            }
+                        }
+                    }
+                    
+                    return expectedValue;
+                };
+                
+                const scenarios = [
+                    { name: 'No Mulligan', handSize: 7, totalCards: 7 + drawsAfterMulligan },
+                    { name: '1 Mulligan', handSize: 6, totalCards: 6 + drawsAfterMulligan },
+                    { name: '2 Mulligans', handSize: 5, totalCards: 5 + drawsAfterMulligan },
+                    { name: '3 Mulligans', handSize: 4, totalCards: 4 + drawsAfterMulligan },
+                ];
+                
+                const data = scenarios.map(scenario => ({
+                    ...scenario,
+                    probability: (calculateComboProb(scenario.totalCards, pieces) * 100).toFixed(1)
+                }));
+                
+                // Add expected value with optimal strategy
+                data.push({
+                    name: `Optimal Strategy (${mulliganThreshold}% threshold)`,
+                    handSize: 'varies',
+                    totalCards: 'varies',
+                    probability: calculateMulliganExpectedValue().toFixed(1)
+                });
+                
+                return data;
+            }, [comboSize, copiesA, copiesB, copiesC, copiesD, mulliganThreshold, drawsAfterMulligan]);
 
             const currentPieces = comboSize === 2 ? [copiesA, copiesB] : 
                                  comboSize === 3 ? [copiesA, copiesB, copiesC] :
@@ -334,6 +406,63 @@
                                 Shows how additional functional copies improve your odds (at {cardsDrawn} cards drawn)
                             </p>
                         </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
+                        <h2 className="text-xl font-semibold mb-4">Mulligan Analysis</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Mulligan Threshold (%)</label>
+                                <input
+                                    type="number"
+                                    value={mulliganThreshold}
+                                    onChange={(e) => setMulliganThreshold(parseInt(e.target.value) || 20)}
+                                    min="0"
+                                    max="100"
+                                    className="w-full p-2 border rounded-md"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Mulligan if combo probability is below this %</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Cards Drawn After Mulligan</label>
+                                <input
+                                    type="number"
+                                    value={drawsAfterMulligan}
+                                    onChange={(e) => setDrawsAfterMulligan(parseInt(e.target.value) || 6)}
+                                    min="0"
+                                    max="15"
+                                    className="w-full p-2 border rounded-md"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Additional cards drawn after keeping a hand</p>
+                            </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-4 gap-2 text-sm">
+                            <div className="font-semibold">Scenario</div>
+                            <div className="font-semibold">Hand Size</div>
+                            <div className="font-semibold">Total Cards</div>
+                            <div className="font-semibold">Probability</div>
+                            {mulliganData.map((item, index) => (
+                                <React.Fragment key={item.name}>
+                                    <div className={index === mulliganData.length - 1 ? 'font-bold text-blue-600' : ''}>
+                                        {item.name}
+                                    </div>
+                                    <div className={index === mulliganData.length - 1 ? 'font-bold text-blue-600' : ''}>
+                                        {item.handSize}
+                                    </div>
+                                    <div className={index === mulliganData.length - 1 ? 'font-bold text-blue-600' : ''}>
+                                        {item.totalCards}
+                                    </div>
+                                    <div className={index === mulliganData.length - 1 ? 'font-bold text-blue-600' : ''}>
+                                        {item.probability}%
+                                    </div>
+                                </React.Fragment>
+                            ))}
+                        </div>
+                        <p className="text-xs text-gray-600 mt-2">
+                            * Opening 7 probability: {(calculateComboProb(7, currentPieces) * 100).toFixed(1)}%. 
+                            Optimal strategy accounts for mulligan decisions based on your threshold.
+                        </p>
                     </div>
                 </div>
             );
