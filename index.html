@@ -6,6 +6,7 @@
     <title>MTG Combo Probability Calculator</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
     <script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,7 +16,9 @@
 
     <script type="text/babel">
         const { useState, useMemo } = React;
-        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
+        
+        // Access Recharts components from the global Recharts object
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = window.Recharts || {};
 
         const MTGComboCalculator = () => {
             const [cardsDrawn, setCardsDrawn] = useState(13);
@@ -107,7 +110,7 @@
                 for (let cards = 13; cards <= 20; cards++) {
                     data.push({
                         cards,
-                        probability: (calculateComboProb(cards, pieces) * 100).toFixed(1)
+                        probability: parseFloat((calculateComboProb(cards, pieces) * 100).toFixed(1))
                     });
                 }
                 return data;
@@ -167,7 +170,7 @@
             const currentProb = calculateComboProb(cardsDrawn, currentPieces);
 
             // Check if Recharts loaded properly
-            if (typeof Recharts === 'undefined') {
+            if (!window.Recharts || !LineChart) {
                 return (
                     <div className="p-6 max-w-6xl mx-auto bg-gray-50 min-h-screen">
                         <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
