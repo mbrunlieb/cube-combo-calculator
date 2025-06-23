@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTG Combo Probability Calculator</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
+
+        const MTGComboCalculator = () => {
+            const [cardsDrawn, setCardsDrawn] = useState(13);
+            const [comboSize, setComboSize] = useState(2);
+            const [copiesA, setCopiesA] = useState(1);
+            const [copiesB, setCopiesB] = useState(1);
+            const [copiesC, setCopiesC] = useState(1);
+            const [copiesD, setCopiesD] = useState(1);
+
+            // Hypergeometric probability: P(X >= k) where X is successes in n draws from population N with K successes
+            const hypergeometric = (N, K, n, k) => {
+                if (k > Math.min(K, n) || k < Math.max(0, n - (N - K))) return 0;
+                
+                const combinations = (n, r) => {
+                    if (r > n || r < 0) return 0;
+                    if (r === 0 || r === n) return 1;
+                    
+                    let result = 1;
+                    for (let i = 0; i < Math.min(r, n - r); i++) {
+                        result = result * (n - i) / (i + 1);
+                    }
+                    return result;
+                };
+                
+                return combinations(K, k) * combinations(N - K, n - k) / combinations(N, n);
+            };
+
+            // Calculate probability of drawing at least 1 of each combo piece
+            const calculateComboProb = (drawn, pieces) => {
+                const deckSize = 40;
+                
+                if (pieces.length === 2) {
+                    const [copiesA, copiesB] = pieces;
+                    const prob0A = hypergeometric(deckSize, copiesA, drawn, 0);
+                    const prob0B = hypergeometric(deckSize, copiesB, drawn, 0);
+                    const prob0AAndB = hypergeometric(deckSize, copiesA + copiesB, drawn, 0);
+                    return 1 - (prob0A + prob0B - prob0AAndB);
+                }
+                
+                if (pieces.length === 3) {
+                    const [copiesA, copiesB, copiesC] = pieces;
+                    // Use inclusion-exclusion principle for 3 sets
+                    const prob0A = hypergeometric(deckSize, copiesA, drawn, 0);
+                    const prob0B = hypergeometric(deckSize, copiesB, drawn, 0);
+                    const prob0C = hypergeometric(deckSize, copiesC, drawn, 0);
+                    const prob0AB = hypergeometric(deckSize, copiesA + copiesB, drawn, 0);
+                    const prob0AC = hypergeometric(deckSize, copiesA + copiesC, drawn, 0);
+                    const prob0BC = hypergeometric(deckSize, copiesB + copiesC, drawn, 0);
+                    const prob0ABC = hypergeometric(deckSize, copiesA + copiesB + copiesC, drawn, 0);
+                    
+                    return 1 - (prob0A + prob0B + prob0C - prob0AB - prob0AC - prob0BC + prob0ABC);
+                }
+                
+                if (pieces.length === 4) {
+                    const [copiesA, copiesB, copiesC, copiesD] = pieces;
+                    // Use inclusion-exclusion principle for 4 sets
+                    const prob0A = hypergeometric(deckSize, copiesA, drawn, 0);
+                    const prob0B = hypergeometric(deckSize, copiesB, drawn, 0);
+                    const prob0C = hypergeometric(deckSize, copiesC, drawn, 0);
+                    const prob0D = hypergeometric(deckSize, copiesD, drawn, 0);
+                    const prob0AB = hypergeometric(deckSize, copiesA + copiesB, drawn, 0);
+                    const prob0AC = hypergeometric(deckSize, copiesA + copiesC, drawn, 0);
+                    const prob0AD = hypergeometric(deckSize, copiesA + copiesD, drawn, 0);
+                    const prob0BC = hypergeometric(deckSize, copiesB + copiesC, drawn, 0);
+                    const prob0BD = hypergeometric(deckSize, copiesB + copiesD, drawn, 0);
+                    const prob0CD = hypergeometric(deckSize, copiesC + copiesD, drawn, 0);
+                    const prob0ABC = hypergeometric(deckSize, copiesA + copiesB + copiesC, drawn, 0);
+                    const prob0ABD = hypergeometric(deckSize, copiesA + copiesB + copiesD, drawn, 0);
+                    const prob0ACD = hypergeometric(deckSize, copiesA + copiesC + copiesD, drawn, 0);
+                    const prob0BCD = hypergeometric(deckSize, copiesB + copiesC + copiesD, drawn, 0);
+                    const prob0ABCD = hypergeometric(deckSize, copiesA + copiesB + copiesC + copiesD, drawn, 0);
+                    
+                    return 1 - (prob0A + prob0B + prob0C + prob0D 
+                                - prob0AB - prob0AC - prob0AD - prob0BC - prob0BD - prob0CD
+                                + prob0ABC + prob0ABD + prob0ACD + prob0BCD
+                                - prob0ABCD);
+                }
+                
+                return 0;
+            };
+
+            // Generate data for cards drawn chart (13-20 cards)
+            const cardsDrawnData = useMemo(() => {
+                const data = [];
+                const pieces = comboSize === 2 ? [copiesA, copiesB] : 
+                               comboSize === 3 ? [copiesA, copiesB, copiesC] :
+                               [copiesA, copiesB, copiesC, copiesD];
+                
+                for (let cards = 13; cards <= 20; cards++) {
+                    data.push({
+                        cards,
+                        probability: (calculateComboProb(cards, pieces) * 100).toFixed(1)
+                    });
+                }
+                return data;
+            }, [comboSize, copiesA, copiesB, copiesC, copiesD]);
+
+            // Generate data for different copy combinations
+            const copyData = useMemo(() => {
+                let scenarios = [];
+                
+                if (comboSize === 2) {
+                    scenarios = [
+                        { name: '1+1', pieces: [1, 1] },
+                        { name: '2+1', pieces: [2, 1] },
+                        { name: '1+2', pieces: [1, 2] },
+                        { name: '2+2', pieces: [2, 2] },
+                        { name: '3+1', pieces: [3, 1] },
+                        { name: '1+3', pieces: [1, 3] },
+                        { name: '3+2', pieces: [3, 2] },
+                        { name: '2+3', pieces: [2, 3] },
+                        { name: '3+3', pieces: [3, 3] }
+                    ];
+                } else if (comboSize === 3) {
+                    scenarios = [
+                        { name: '1+1+1', pieces: [1, 1, 1] },
+                        { name: '2+1+1', pieces: [2, 1, 1] },
+                        { name: '1+2+1', pieces: [1, 2, 1] },
+                        { name: '1+1+2', pieces: [1, 1, 2] },
+                        { name: '2+2+1', pieces: [2, 2, 1] },
+                        { name: '2+1+2', pieces: [2, 1, 2] },
+                        { name: '1+2+2', pieces: [1, 2, 2] },
+                        { name: '2+2+2', pieces: [2, 2, 2] },
+                        { name: '3+1+1', pieces: [3, 1, 1] }
+                    ];
+                } else {
+                    scenarios = [
+                        { name: '1+1+1+1', pieces: [1, 1, 1, 1] },
+                        { name: '2+1+1+1', pieces: [2, 1, 1, 1] },
+                        { name: '1+2+1+1', pieces: [1, 2, 1, 1] },
+                        { name: '1+1+2+1', pieces: [1, 1, 2, 1] },
+                        { name: '1+1+1+2', pieces: [1, 1, 1, 2] },
+                        { name: '2+2+1+1', pieces: [2, 2, 1, 1] },
+                        { name: '2+1+2+1', pieces: [2, 1, 2, 1] },
+                        { name: '2+1+1+2', pieces: [2, 1, 1, 2] },
+                        { name: '2+2+2+2', pieces: [2, 2, 2, 2] }
+                    ];
+                }
+                
+                return scenarios.map(scenario => ({
+                    ...scenario,
+                    probability: (calculateComboProb(cardsDrawn, scenario.pieces) * 100).toFixed(1)
+                }));
+            }, [cardsDrawn, comboSize]);
+
+            const currentPieces = comboSize === 2 ? [copiesA, copiesB] : 
+                                 comboSize === 3 ? [copiesA, copiesB, copiesC] :
+                                 [copiesA, copiesB, copiesC, copiesD];
+            const currentProb = calculateComboProb(cardsDrawn, currentPieces);
+
+            return (
+                <div className="p-6 max-w-6xl mx-auto bg-gray-50 min-h-screen">
+                    <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
+                        MTG Combo Probability Calculator
+                    </h1>
+                    
+                    <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                        <h2 className="text-xl font-semibold mb-4">Current Scenario</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Combo Size</label>
+                                <select
+                                    value={comboSize}
+                                    onChange={(e) => setComboSize(parseInt(e.target.value))}
+                                    className="w-full p-2 border rounded-md"
+                                >
+                                    <option value={2}>2 Cards</option>
+                                    <option value={3}>3 Cards</option>
+                                    <option value={4}>4 Cards</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Cards Drawn</label>
+                                <input
+                                    type="number"
+                                    value={cardsDrawn}
+                                    onChange={(e) => setCardsDrawn(parseInt(e.target.value) || 13)}
+                                    min="1"
+                                    max="40"
+                                    className="w-full p-2 border rounded-md"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Copies of Piece A</label>
+                                <input
+                                    type="number"
+                                    value={copiesA}
+                                    onChange={(e) => setCopiesA(parseInt(e.target.value) || 1)}
+                                    min="1"
+                                    max="10"
+                                    className="w-full p-2 border rounded-md"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Copies of Piece B</label>
+                                <input
+                                    type="number"
+                                    value={copiesB}
+                                    onChange={(e) => setCopiesB(parseInt(e.target.value) || 1)}
+                                    min="1"
+                                    max="10"
+                                    className="w-full p-2 border rounded-md"
+                                />
+                            </div>
+                        </div>
+                        
+                        {comboSize >= 3 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Copies of Piece C</label>
+                                    <input
+                                        type="number"
+                                        value={copiesC}
+                                        onChange={(e) => setCopiesC(parseInt(e.target.value) || 1)}
+                                        min="1"
+                                        max="10"
+                                        className="w-full p-2 border rounded-md"
+                                    />
+                                </div>
+                                {comboSize >= 4 && (
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Copies of Piece D</label>
+                                        <input
+                                            type="number"
+                                            value={copiesD}
+                                            onChange={(e) => setCopiesD(parseInt(e.target.value) || 1)}
+                                            min="1"
+                                            max="10"
+                                            className="w-full p-2 border rounded-md"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
+                        <div className="text-center">
+                            <div className="text-3xl font-bold text-blue-600 mb-2">
+                                {(currentProb * 100).toFixed(1)}%
+                            </div>
+                            <div className="text-gray-600">
+                                Probability of drawing all {comboSize} combo pieces
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-lg shadow-lg p-6">
+                            <h2 className="text-xl font-semibold mb-4">Probability vs Cards Drawn</h2>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={cardsDrawnData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="cards" />
+                                    <YAxis label={{ value: 'Probability (%)', angle: -90, position: 'insideLeft' }} />
+                                    <Tooltip formatter={(value) => [`${value}%`, 'Probability']} />
+                                    <Line type="monotone" dataKey="probability" stroke="#2563eb" strokeWidth={3} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                            <p className="text-sm text-gray-600 mt-2">
+                                Shows how probability changes as you see more cards (current: {
+                                    comboSize === 2 ? `${copiesA}+${copiesB}` :
+                                    comboSize === 3 ? `${copiesA}+${copiesB}+${copiesC}` :
+                                    `${copiesA}+${copiesB}+${copiesC}+${copiesD}`
+                                } copies)
+                            </p>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow-lg p-6">
+                            <h2 className="text-xl font-semibold mb-4">Probability vs Copy Count</h2>
+                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                <div className="font-semibold">Copies</div>
+                                <div className="font-semibold">Probability</div>
+                                <div className="font-semibold">Improvement</div>
+                                {copyData.map((item, index) => (
+                                    <React.Fragment key={item.name}>
+                                        <div className={JSON.stringify(item.pieces) === JSON.stringify(currentPieces) ? 'font-bold text-blue-600' : ''}>
+                                            {item.name}
+                                        </div>
+                                        <div className={JSON.stringify(item.pieces) === JSON.stringify(currentPieces) ? 'font-bold text-blue-600' : ''}>
+                                            {item.probability}%
+                                        </div>
+                                        <div className="text-gray-600">
+                                            {index > 0 ? `+${(parseFloat(item.probability) - parseFloat(copyData[0].probability)).toFixed(1)}%` : '—'}
+                                        </div>
+                                    </React.Fragment>
+                                ))}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-2">
+                                Shows how additional functional copies improve your odds (at {cardsDrawn} cards drawn)
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
+                        <h2 className="text-xl font-semibold mb-4">Key Insights</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            {comboSize === 2 && (
+                                <>
+                                    <div>
+                                        <h3 className="font-semibold mb-2">Baseline (1+1 copies at 13 cards):</h3>
+                                        <p className="text-gray-600">
+                                            {(calculateComboProb(13, [1, 1]) * 100).toFixed(1)}% chance - quite low for cube design
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold mb-2">Adding copies helps significantly:</h3>
+                                        <p className="text-gray-600">
+                                            Going from 1+1 to 2+2 copies increases odds by {(calculateComboProb(13, [2, 2]) * 100 - calculateComboProb(13, [1, 1]) * 100).toFixed(1)} percentage points
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold mb-2">Seeing more cards:</h3>
+                                        <p className="text-gray-600">
+                                            Each additional card drawn adds ~{((calculateComboProb(14, [1, 1]) - calculateComboProb(13, [1, 1])) * 100).toFixed(1)}% for 1+1 copies
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold mb-2">Asymmetric copies:</h3>
+                                        <p className="text-gray-600">
+                                            2+1 gives {(calculateComboProb(13, [2, 1]) * 100).toFixed(1)}% vs 1+2 giving {(calculateComboProb(13, [1, 2]) * 100).toFixed(1)}%
+                                        </p>
+                                    </div>
+                                </>
+                            )}
+                            {comboSize === 3 && (
+                                <>
+                                    <div>
+                                        <h3 className="font-semibold mb-2">Baseline (1+1+1 copies at 13 cards):</h3>
+                                        <p className="text-gray-600">
+                                            {(calculateComboProb(13, [1, 1, 1]) * 100).toFixed(1)}% chance - very low for cube design
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold mb-2">Adding copies is crucial:</h3>
+                                        <p className="text-gray-600">
+                                            Going from 1+1+1 to 2+2+2 increases odds by {(calculateComboProb(13, [2, 2, 2]) * 100 - calculateComboProb(13, [1, 1, 1]) * 100).toFixed(1)} percentage points
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold mb-2">Seeing more cards:</h3>
+                                        <p className="text-gray-600">
+                                            Each additional card adds ~{((calculateComboProb(14, [1, 1, 1]) - calculateComboProb(13, [1, 1, 1])) * 100).toFixed(1)}% for 1+1+1 copies
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold mb-2">Uneven distribution:</h3>
+                                        <p className="text-gray-600">
+                                            2+1+1 gives {(calculateComboProb(13, [2, 1, 1]) * 100).toFixed(1)}% vs 1+2+1 giving {(calculateComboProb(13, [1, 2, 1]) * 100).toFixed(1)}%
+                                        </p>
+                                    </div>
+                                </>
+                            )}
+                            {comboSize === 4 && (
+                                <>
+                                    <div>
+                                        <h3 className="font-semibold mb-2">Baseline (1+1+1+1 copies at 13 cards):</h3>
+                                        <p className="text-gray-600">
+                                            {(calculateComboProb(13, [1, 1, 1, 1]) * 100).toFixed(1)}% chance - extremely low for cube
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold mb-2">Multiple copies essential:</h3>
+                                        <p className="text-gray-600">
+                                            Going from 1+1+1+1 to 2+2+2+2 increases odds by {(calculateComboProb(13, [2, 2, 2, 2]) * 100 - calculateComboProb(13, [1, 1, 1, 1]) * 100).toFixed(1)} percentage points
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold mb-2">Seeing more cards:</h3>
+                                        <p className="text-gray-600">
+                                            Each additional card adds ~{((calculateComboProb(14, [1, 1, 1, 1]) - calculateComboProb(13, [1, 1, 1, 1])) * 100).toFixed(1)}% for 1+1+1+1 copies
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold mb-2">4-card combos need support:</h3>
+                                        <p className="text-gray-600">
+                                            Consider tutors, card selection, or reducing to 3-card versions
+                                        </p>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<MTGComboCalculator />, document.getElementById('root'));
+    </script>
+</body>
+</html>
