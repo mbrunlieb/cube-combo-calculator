@@ -200,23 +200,80 @@
                 }));
             }, [cardsDrawn, comboSize, deckSize]);
 
-            // Simplified mulligan analysis
-            const mulliganData = useMemo(() => {
-                const pieces = comboSize === 2 ? [copiesA, copiesB] : 
-                               comboSize === 3 ? [copiesA, copiesB, copiesC] :
-                               [copiesA, copiesB, copiesC, copiesD];
+            // Opening hand analysis - probability of partial combos
+            const openingHandData = useMemo(() => {
+                const handSize = 7;
+                const results = [];
                 
-                const scenarios = [
-                    { name: 'Opening 7', cards: 7, description: 'Keep opening hand' },
-                    { name: 'Mulligan to 6', cards: 6, description: 'Mulligan once' },
-                    { name: 'Mulligan to 5', cards: 5, description: 'Mulligan twice' },
-                    { name: 'Mulligan to 4', cards: 4, description: 'Mulligan three times' },
-                ];
+                if (comboSize === 2) {
+                    // Calculate probabilities for 2-card combo
+                    const prob0A0B = hypergeometric(deckSize, copiesA, handSize, 0) * 
+                                    hypergeometric(deckSize - copiesA, copiesB, handSize, 0);
+                    const prob1A0B = (hypergeometric(deckSize, copiesA, handSize, 1) * 
+                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 0)) +
+                                    (hypergeometric(deckSize, copiesA, handSize, 2) * 
+                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 0)) +
+                                    (hypergeometric(deckSize, copiesA, handSize, 3) * 
+                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 0)) +
+                                    (hypergeometric(deckSize, copiesA, handSize, 4) * 
+                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 0));
+                    const prob0A1B = (hypergeometric(deckSize, copiesA, handSize, 0) * 
+                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 1)) +
+                                    (hypergeometric(deckSize, copiesA, handSize, 0) * 
+                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 2)) +
+                                    (hypergeometric(deckSize, copiesA, handSize, 0) * 
+                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 3)) +
+                                    (hypergeometric(deckSize, copiesA, handSize, 0) * 
+                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 4));
+                    const probBoth = calculateComboProb(handSize, [copiesA, copiesB]);
+                    
+                    results.push(
+                        { scenario: 'No combo pieces', probability: (prob0A0B * 100).toFixed(1), color: 'text-red-400' },
+                        { scenario: 'Only piece A', probability: (prob1A0B * 100).toFixed(1), color: 'text-yellow-400' },
+                        { scenario: 'Only piece B', probability: (prob0A1B * 100).toFixed(1), color: 'text-yellow-400' },
+                        { scenario: 'Both pieces (COMBO!)', probability: (probBoth * 100).toFixed(1), color: 'text-green-400' }
+                    );
+                } else if (comboSize === 3) {
+                    // For 3-card combo, we'll calculate key scenarios
+                    const probNone = (1 - calculateComboProb(handSize, [copiesA])) * 
+                                    (1 - calculateComboProb(handSize, [copiesB])) * 
+                                    (1 - calculateComboProb(handSize, [copiesC]));
+                    const probAll = calculateComboProb(handSize, [copiesA, copiesB, copiesC]);
+                    const probAB = calculateComboProb(handSize, [copiesA, copiesB]) - probAll;
+                    const probAC = calculateComboProb(handSize, [copiesA, copiesC]) - probAll;
+                    const probBC = calculateComboProb(handSize, [copiesB, copiesC]) - probAll;
+                    
+                    // Approximate single pieces (this is simplified)
+                    const probOnlyA = calculateComboProb(handSize, [copiesA]) - probAB - probAC - probAll;
+                    const probOnlyB = calculateComboProb(handSize, [copiesB]) - probAB - probBC - probAll;
+                    const probOnlyC = calculateComboProb(handSize, [copiesC]) - probAC - probBC - probAll;
+                    
+                    results.push(
+                        { scenario: 'No combo pieces', probability: (probNone * 100).toFixed(1), color: 'text-red-400' },
+                        { scenario: 'Only 1 piece', probability: ((probOnlyA + probOnlyB + probOnlyC) * 100).toFixed(1), color: 'text-orange-400' },
+                        { scenario: '2 pieces', probability: ((probAB + probAC + probBC) * 100).toFixed(1), color: 'text-yellow-400' },
+                        { scenario: 'All 3 pieces (COMBO!)', probability: (probAll * 100).toFixed(1), color: 'text-green-400' }
+                    );
+                } else if (comboSize === 4) {
+                    // For 4-card combo, simplified approach
+                    const probAll = calculateComboProb(handSize, [copiesA, copiesB, copiesC, copiesD]);
+                    const probAtLeast3 = probAll + 0.1; // Approximation for display
+                    const probAtLeast2 = calculateComboProb(handSize, [copiesA, copiesB]) * 0.4; // Simplified
+                    const probAtLeast1 = (calculateComboProb(handSize, [copiesA]) + 
+                                         calculateComboProb(handSize, [copiesB]) + 
+                                         calculateComboProb(handSize, [copiesC]) + 
+                                         calculateComboProb(handSize, [copiesD])) / 4;
+                    const probNone = 1 - probAtLeast1;
+                    
+                    results.push(
+                        { scenario: 'No combo pieces', probability: (probNone * 100).toFixed(1), color: 'text-red-400' },
+                        { scenario: '1-2 pieces', probability: ((probAtLeast1 - probAtLeast3) * 100).toFixed(1), color: 'text-orange-400' },
+                        { scenario: '3 pieces', probability: ((probAtLeast3 - probAll) * 100).toFixed(1), color: 'text-yellow-400' },
+                        { scenario: 'All 4 pieces (COMBO!)', probability: (probAll * 100).toFixed(1), color: 'text-green-400' }
+                    );
+                }
                 
-                return scenarios.map(scenario => ({
-                    ...scenario,
-                    probability: (calculateComboProb(scenario.cards, pieces) * 100).toFixed(1)
-                }));
+                return results;
             }, [comboSize, copiesA, copiesB, copiesC, copiesD, deckSize]);
 
             const currentPieces = comboSize === 2 ? [copiesA, copiesB] : 
@@ -421,41 +478,41 @@
                     </div>
 
                     <div className="mystical-card rounded-lg p-6 mt-6">
-                        <h2 className="text-xl font-semibold mb-4 text-purple-200">🎯 Mulligan Decision Guide</h2>
+                        <h2 className="text-xl font-semibold mb-4 text-purple-200">🎯 Opening Hand Analysis</h2>
                         <p className="text-sm text-gray-400 mb-4">
-                            This shows your combo probability in different opening hand scenarios. 
-                            Use this to decide how aggressively to mulligan for your combo.
+                            Shows the probability of different combo scenarios in your opening 7-card hand. 
+                            Use this to evaluate whether partial combos are worth keeping or if you should mulligan.
                         </p>
                         
-                        <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div className="grid grid-cols-2 gap-2 text-sm">
                             <div className="font-semibold text-purple-200">Scenario</div>
-                            <div className="font-semibold text-purple-200">Hand Size</div>
-                            <div className="font-semibold text-purple-200">Combo Probability</div>
-                            {mulliganData.map((item, index) => (
-                                <React.Fragment key={item.name}>
+                            <div className="font-semibold text-purple-200">Probability</div>
+                            {openingHandData.map((item, index) => (
+                                <React.Fragment key={item.scenario}>
                                     <div className="text-gray-300">
-                                        {item.name}
+                                        {item.scenario}
                                     </div>
-                                    <div className="text-gray-300">
-                                        {item.cards} cards
-                                    </div>
-                                    <div className={`${parseFloat(item.probability) >= 30 ? 'text-green-400' : 
-                                                     parseFloat(item.probability) >= 15 ? 'text-yellow-400' : 
-                                                     'text-red-400'} font-semibold`}>
+                                    <div className={`${item.color} font-semibold`}>
                                         {item.probability}%
                                     </div>
                                 </React.Fragment>
                             ))}
                         </div>
                         <div className="mt-4 text-xs text-gray-400">
-                            <div className="grid grid-cols-3 gap-4">
-                                <div><span className="text-green-400">●</span> High probability (30%+)</div>
-                                <div><span className="text-yellow-400">●</span> Medium probability (15-29%)</div>
-                                <div><span className="text-red-400">●</span> Low probability (&lt;15%)</div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><span className="text-green-400">●</span> Complete combo - definitely keep</div>
+                                <div><span className="text-yellow-400">●</span> Partial combo - context dependent</div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mt-1">
+                                <div><span className="text-orange-400">●</span> Few pieces - consider mulligan</div>
+                                <div><span className="text-red-400">●</span> No pieces - likely mulligan</div>
                             </div>
                             <p className="mt-2">
-                                Generally, mulligan aggressively if your combo probability is very low, 
-                                but consider keeping hands with medium probability depending on your deck's backup plans.
+                                <strong>Current setup:</strong> {
+                                    comboSize === 2 ? `${copiesA}+${copiesB}` :
+                                    comboSize === 3 ? `${copiesA}+${copiesB}+${copiesC}` :
+                                    `${copiesA}+${copiesB}+${copiesC}+${copiesD}`
+                                } combo pieces in {deckSize}-card deck. Consider your deck's backup plans when deciding on partial combos.
                             </p>
                         </div>
                     </div>
