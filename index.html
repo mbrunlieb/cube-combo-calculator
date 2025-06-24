@@ -205,27 +205,63 @@
                 const handSize = 7;
                 const results = [];
                 
+                // Helper function for multivariate hypergeometric distribution
+                const multivariateHypergeometric = (deckSize, pieces, handSize, draws) => {
+                    // pieces = [copiesA, copiesB, copiesC, ...]
+                    // draws = [drawsA, drawsB, drawsC, ...]
+                    
+                    if (pieces.length !== draws.length) return 0;
+                    if (draws.reduce((a, b) => a + b, 0) > handSize) return 0;
+                    
+                    const totalPieces = pieces.reduce((a, b) => a + b, 0);
+                    const totalDraws = draws.reduce((a, b) => a + b, 0);
+                    const otherCards = deckSize - totalPieces;
+                    const otherDraws = handSize - totalDraws;
+                    
+                    if (otherDraws < 0 || otherCards < otherDraws) return 0;
+                    
+                    const combinations = (n, r) => {
+                        if (r > n || r < 0) return 0;
+                        if (r === 0 || r === n) return 1;
+                        
+                        let result = 1;
+                        for (let i = 0; i < Math.min(r, n - r); i++) {
+                            result = result * (n - i) / (i + 1);
+                        }
+                        return result;
+                    };
+                    
+                    let numerator = 1;
+                    for (let i = 0; i < pieces.length; i++) {
+                        numerator *= combinations(pieces[i], draws[i]);
+                    }
+                    numerator *= combinations(otherCards, otherDraws);
+                    
+                    const denominator = combinations(deckSize, handSize);
+                    
+                    return numerator / denominator;
+                };
+                
                 if (comboSize === 2) {
-                    // Calculate probabilities for 2-card combo
-                    const prob0A0B = hypergeometric(deckSize, copiesA, handSize, 0) * 
-                                    hypergeometric(deckSize - copiesA, copiesB, handSize, 0);
-                    const prob1A0B = (hypergeometric(deckSize, copiesA, handSize, 1) * 
-                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 0)) +
-                                    (hypergeometric(deckSize, copiesA, handSize, 2) * 
-                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 0)) +
-                                    (hypergeometric(deckSize, copiesA, handSize, 3) * 
-                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 0)) +
-                                    (hypergeometric(deckSize, copiesA, handSize, 4) * 
-                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 0));
-                    const prob0A1B = (hypergeometric(deckSize, copiesA, handSize, 0) * 
-                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 1)) +
-                                    (hypergeometric(deckSize, copiesA, handSize, 0) * 
-                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 2)) +
-                                    (hypergeometric(deckSize, copiesA, handSize, 0) * 
-                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 3)) +
-                                    (hypergeometric(deckSize, copiesA, handSize, 0) * 
-                                     hypergeometric(deckSize - copiesA, copiesB, handSize, 4));
-                    const probBoth = calculateComboProb(handSize, [copiesA, copiesB]);
+                    // Calculate exact probabilities for 2-card combo
+                    const prob0A0B = multivariateHypergeometric(deckSize, [copiesA, copiesB], handSize, [0, 0]);
+                    
+                    let prob1A0B = 0;
+                    for (let a = 1; a <= Math.min(copiesA, handSize); a++) {
+                        prob1A0B += multivariateHypergeometric(deckSize, [copiesA, copiesB], handSize, [a, 0]);
+                    }
+                    
+                    let prob0A1B = 0;
+                    for (let b = 1; b <= Math.min(copiesB, handSize); b++) {
+                        prob0A1B += multivariateHypergeometric(deckSize, [copiesA, copiesB], handSize, [0, b]);
+                    }
+                    
+                    let probBoth = 0;
+                    for (let a = 1; a <= Math.min(copiesA, handSize); a++) {
+                        for (let b = 1; b <= Math.min(copiesB, handSize - a); b++) {
+                            probBoth += multivariateHypergeometric(deckSize, [copiesA, copiesB], handSize, [a, b]);
+                        }
+                    }
                     
                     results.push(
                         { scenario: 'No combo pieces', probability: (prob0A0B * 100).toFixed(1), color: 'text-red-400' },
@@ -234,42 +270,67 @@
                         { scenario: 'Both pieces (COMBO!)', probability: (probBoth * 100).toFixed(1), color: 'text-green-400' }
                     );
                 } else if (comboSize === 3) {
-                    // For 3-card combo, we'll calculate key scenarios
-                    const probNone = (1 - calculateComboProb(handSize, [copiesA])) * 
-                                    (1 - calculateComboProb(handSize, [copiesB])) * 
-                                    (1 - calculateComboProb(handSize, [copiesC]));
-                    const probAll = calculateComboProb(handSize, [copiesA, copiesB, copiesC]);
-                    const probAB = calculateComboProb(handSize, [copiesA, copiesB]) - probAll;
-                    const probAC = calculateComboProb(handSize, [copiesA, copiesC]) - probAll;
-                    const probBC = calculateComboProb(handSize, [copiesB, copiesC]) - probAll;
+                    // Calculate exact probabilities for 3-card combo
+                    const prob0A0B0C = multivariateHypergeometric(deckSize, [copiesA, copiesB, copiesC], handSize, [0, 0, 0]);
                     
-                    // Approximate single pieces (this is simplified)
-                    const probOnlyA = calculateComboProb(handSize, [copiesA]) - probAB - probAC - probAll;
-                    const probOnlyB = calculateComboProb(handSize, [copiesB]) - probAB - probBC - probAll;
-                    const probOnlyC = calculateComboProb(handSize, [copiesC]) - probAC - probBC - probAll;
+                    // Exactly 1 piece scenarios
+                    let probOnly1 = 0;
+                    for (let a = 1; a <= Math.min(copiesA, handSize); a++) {
+                        probOnly1 += multivariateHypergeometric(deckSize, [copiesA, copiesB, copiesC], handSize, [a, 0, 0]);
+                    }
+                    for (let b = 1; b <= Math.min(copiesB, handSize); b++) {
+                        probOnly1 += multivariateHypergeometric(deckSize, [copiesA, copiesB, copiesC], handSize, [0, b, 0]);
+                    }
+                    for (let c = 1; c <= Math.min(copiesC, handSize); c++) {
+                        probOnly1 += multivariateHypergeometric(deckSize, [copiesA, copiesB, copiesC], handSize, [0, 0, c]);
+                    }
+                    
+                    // Exactly 2 pieces scenarios
+                    let probExactly2 = 0;
+                    for (let a = 1; a <= Math.min(copiesA, handSize); a++) {
+                        for (let b = 1; b <= Math.min(copiesB, handSize - a); b++) {
+                            probExactly2 += multivariateHypergeometric(deckSize, [copiesA, copiesB, copiesC], handSize, [a, b, 0]);
+                        }
+                    }
+                    for (let a = 1; a <= Math.min(copiesA, handSize); a++) {
+                        for (let c = 1; c <= Math.min(copiesC, handSize - a); c++) {
+                            probExactly2 += multivariateHypergeometric(deckSize, [copiesA, copiesB, copiesC], handSize, [a, 0, c]);
+                        }
+                    }
+                    for (let b = 1; b <= Math.min(copiesB, handSize); b++) {
+                        for (let c = 1; c <= Math.min(copiesC, handSize - b); c++) {
+                            probExactly2 += multivariateHypergeometric(deckSize, [copiesA, copiesB, copiesC], handSize, [0, b, c]);
+                        }
+                    }
+                    
+                    // All 3 pieces
+                    let probAll3 = 0;
+                    for (let a = 1; a <= Math.min(copiesA, handSize); a++) {
+                        for (let b = 1; b <= Math.min(copiesB, handSize - a); b++) {
+                            for (let c = 1; c <= Math.min(copiesC, handSize - a - b); c++) {
+                                probAll3 += multivariateHypergeometric(deckSize, [copiesA, copiesB, copiesC], handSize, [a, b, c]);
+                            }
+                        }
+                    }
                     
                     results.push(
-                        { scenario: 'No combo pieces', probability: (probNone * 100).toFixed(1), color: 'text-red-400' },
-                        { scenario: 'Only 1 piece', probability: ((probOnlyA + probOnlyB + probOnlyC) * 100).toFixed(1), color: 'text-orange-400' },
-                        { scenario: '2 pieces', probability: ((probAB + probAC + probBC) * 100).toFixed(1), color: 'text-yellow-400' },
-                        { scenario: 'All 3 pieces (COMBO!)', probability: (probAll * 100).toFixed(1), color: 'text-green-400' }
+                        { scenario: 'No combo pieces', probability: (prob0A0B0C * 100).toFixed(1), color: 'text-red-400' },
+                        { scenario: 'Only 1 piece', probability: (probOnly1 * 100).toFixed(1), color: 'text-orange-400' },
+                        { scenario: '2 pieces', probability: (probExactly2 * 100).toFixed(1), color: 'text-yellow-400' },
+                        { scenario: 'All 3 pieces (COMBO!)', probability: (probAll3 * 100).toFixed(1), color: 'text-green-400' }
                     );
                 } else if (comboSize === 4) {
-                    // For 4-card combo, simplified approach
-                    const probAll = calculateComboProb(handSize, [copiesA, copiesB, copiesC, copiesD]);
-                    const probAtLeast3 = probAll + 0.1; // Approximation for display
-                    const probAtLeast2 = calculateComboProb(handSize, [copiesA, copiesB]) * 0.4; // Simplified
-                    const probAtLeast1 = (calculateComboProb(handSize, [copiesA]) + 
-                                         calculateComboProb(handSize, [copiesB]) + 
-                                         calculateComboProb(handSize, [copiesC]) + 
-                                         calculateComboProb(handSize, [copiesD])) / 4;
-                    const probNone = 1 - probAtLeast1;
+                    // For 4-card combo, calculate key scenarios (simplified but correct)
+                    const probAll4 = calculateComboProb(handSize, [copiesA, copiesB, copiesC, copiesD]);
+                    
+                    // Approximate other scenarios for now due to complexity
+                    const probNone = multivariateHypergeometric(deckSize, [copiesA, copiesB, copiesC, copiesD], handSize, [0, 0, 0, 0]);
+                    const probSome = 1 - probNone - probAll4;
                     
                     results.push(
                         { scenario: 'No combo pieces', probability: (probNone * 100).toFixed(1), color: 'text-red-400' },
-                        { scenario: '1-2 pieces', probability: ((probAtLeast1 - probAtLeast3) * 100).toFixed(1), color: 'text-orange-400' },
-                        { scenario: '3 pieces', probability: ((probAtLeast3 - probAll) * 100).toFixed(1), color: 'text-yellow-400' },
-                        { scenario: 'All 4 pieces (COMBO!)', probability: (probAll * 100).toFixed(1), color: 'text-green-400' }
+                        { scenario: '1-3 pieces', probability: (probSome * 100).toFixed(1), color: 'text-orange-400' },
+                        { scenario: 'All 4 pieces (COMBO!)', probability: (probAll4 * 100).toFixed(1), color: 'text-green-400' }
                     );
                 }
                 
