@@ -3,13 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MTG Combo Probability Calculator</title>
+    <title>Mystical MTG Combo Calculator</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
     <script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #2d1b69 100%);
+            min-height: 100vh;
+        }
+        .mystical-card {
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(51, 65, 85, 0.8));
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            box-shadow: 0 8px 32px rgba(139, 92, 246, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        .mystical-input {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            color: #e2e8f0;
+        }
+        .mystical-input:focus {
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+        .mystical-select {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            color: #e2e8f0;
+        }
+        .glow-text {
+            text-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+        }
+        .chart-container {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            padding: 16px;
+        }
+    </style>
 </head>
 <body>
     <div id="root"></div>
@@ -21,14 +55,13 @@
         const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = window.Recharts || {};
 
         const MTGComboCalculator = () => {
+            const [deckSize, setDeckSize] = useState(40);
             const [cardsDrawn, setCardsDrawn] = useState(13);
             const [comboSize, setComboSize] = useState(2);
             const [copiesA, setCopiesA] = useState(1);
             const [copiesB, setCopiesB] = useState(1);
             const [copiesC, setCopiesC] = useState(1);
             const [copiesD, setCopiesD] = useState(1);
-            const [mulliganThreshold, setMulliganThreshold] = useState(20);
-            const [drawsAfterMulligan, setDrawsAfterMulligan] = useState(6);
 
             // Hypergeometric probability: P(X >= k) where X is successes in n draws from population N with K successes
             const hypergeometric = (N, K, n, k) => {
@@ -49,27 +82,25 @@
             };
 
             // Calculate probability of drawing at least 1 of each combo piece
-            const calculateComboProb = (drawn, pieces) => {
-                const deckSize = 40;
-                
+            const calculateComboProb = (drawn, pieces, totalDeckSize = deckSize) => {
                 if (pieces.length === 2) {
                     const [copiesA, copiesB] = pieces;
-                    const prob0A = hypergeometric(deckSize, copiesA, drawn, 0);
-                    const prob0B = hypergeometric(deckSize, copiesB, drawn, 0);
-                    const prob0AAndB = hypergeometric(deckSize, copiesA + copiesB, drawn, 0);
+                    const prob0A = hypergeometric(totalDeckSize, copiesA, drawn, 0);
+                    const prob0B = hypergeometric(totalDeckSize, copiesB, drawn, 0);
+                    const prob0AAndB = hypergeometric(totalDeckSize, copiesA + copiesB, drawn, 0);
                     return 1 - (prob0A + prob0B - prob0AAndB);
                 }
                 
                 if (pieces.length === 3) {
                     const [copiesA, copiesB, copiesC] = pieces;
                     // Use inclusion-exclusion principle for 3 sets
-                    const prob0A = hypergeometric(deckSize, copiesA, drawn, 0);
-                    const prob0B = hypergeometric(deckSize, copiesB, drawn, 0);
-                    const prob0C = hypergeometric(deckSize, copiesC, drawn, 0);
-                    const prob0AB = hypergeometric(deckSize, copiesA + copiesB, drawn, 0);
-                    const prob0AC = hypergeometric(deckSize, copiesA + copiesC, drawn, 0);
-                    const prob0BC = hypergeometric(deckSize, copiesB + copiesC, drawn, 0);
-                    const prob0ABC = hypergeometric(deckSize, copiesA + copiesB + copiesC, drawn, 0);
+                    const prob0A = hypergeometric(totalDeckSize, copiesA, drawn, 0);
+                    const prob0B = hypergeometric(totalDeckSize, copiesB, drawn, 0);
+                    const prob0C = hypergeometric(totalDeckSize, copiesC, drawn, 0);
+                    const prob0AB = hypergeometric(totalDeckSize, copiesA + copiesB, drawn, 0);
+                    const prob0AC = hypergeometric(totalDeckSize, copiesA + copiesC, drawn, 0);
+                    const prob0BC = hypergeometric(totalDeckSize, copiesB + copiesC, drawn, 0);
+                    const prob0ABC = hypergeometric(totalDeckSize, copiesA + copiesB + copiesC, drawn, 0);
                     
                     return 1 - (prob0A + prob0B + prob0C - prob0AB - prob0AC - prob0BC + prob0ABC);
                 }
@@ -77,21 +108,21 @@
                 if (pieces.length === 4) {
                     const [copiesA, copiesB, copiesC, copiesD] = pieces;
                     // Use inclusion-exclusion principle for 4 sets
-                    const prob0A = hypergeometric(deckSize, copiesA, drawn, 0);
-                    const prob0B = hypergeometric(deckSize, copiesB, drawn, 0);
-                    const prob0C = hypergeometric(deckSize, copiesC, drawn, 0);
-                    const prob0D = hypergeometric(deckSize, copiesD, drawn, 0);
-                    const prob0AB = hypergeometric(deckSize, copiesA + copiesB, drawn, 0);
-                    const prob0AC = hypergeometric(deckSize, copiesA + copiesC, drawn, 0);
-                    const prob0AD = hypergeometric(deckSize, copiesA + copiesD, drawn, 0);
-                    const prob0BC = hypergeometric(deckSize, copiesB + copiesC, drawn, 0);
-                    const prob0BD = hypergeometric(deckSize, copiesB + copiesD, drawn, 0);
-                    const prob0CD = hypergeometric(deckSize, copiesC + copiesD, drawn, 0);
-                    const prob0ABC = hypergeometric(deckSize, copiesA + copiesB + copiesC, drawn, 0);
-                    const prob0ABD = hypergeometric(deckSize, copiesA + copiesB + copiesD, drawn, 0);
-                    const prob0ACD = hypergeometric(deckSize, copiesA + copiesC + copiesD, drawn, 0);
-                    const prob0BCD = hypergeometric(deckSize, copiesB + copiesC + copiesD, drawn, 0);
-                    const prob0ABCD = hypergeometric(deckSize, copiesA + copiesB + copiesC + copiesD, drawn, 0);
+                    const prob0A = hypergeometric(totalDeckSize, copiesA, drawn, 0);
+                    const prob0B = hypergeometric(totalDeckSize, copiesB, drawn, 0);
+                    const prob0C = hypergeometric(totalDeckSize, copiesC, drawn, 0);
+                    const prob0D = hypergeometric(totalDeckSize, copiesD, drawn, 0);
+                    const prob0AB = hypergeometric(totalDeckSize, copiesA + copiesB, drawn, 0);
+                    const prob0AC = hypergeometric(totalDeckSize, copiesA + copiesC, drawn, 0);
+                    const prob0AD = hypergeometric(totalDeckSize, copiesA + copiesD, drawn, 0);
+                    const prob0BC = hypergeometric(totalDeckSize, copiesB + copiesC, drawn, 0);
+                    const prob0BD = hypergeometric(totalDeckSize, copiesB + copiesD, drawn, 0);
+                    const prob0CD = hypergeometric(totalDeckSize, copiesC + copiesD, drawn, 0);
+                    const prob0ABC = hypergeometric(totalDeckSize, copiesA + copiesB + copiesC, drawn, 0);
+                    const prob0ABD = hypergeometric(totalDeckSize, copiesA + copiesB + copiesD, drawn, 0);
+                    const prob0ACD = hypergeometric(totalDeckSize, copiesA + copiesC + copiesD, drawn, 0);
+                    const prob0BCD = hypergeometric(totalDeckSize, copiesB + copiesC + copiesD, drawn, 0);
+                    const prob0ABCD = hypergeometric(totalDeckSize, copiesA + copiesB + copiesC + copiesD, drawn, 0);
                     
                     return 1 - (prob0A + prob0B + prob0C + prob0D 
                                 - prob0AB - prob0AC - prob0AD - prob0BC - prob0BD - prob0CD
@@ -102,23 +133,26 @@
                 return 0;
             };
 
-            // Generate data for cards drawn chart (13-20 cards)
+            // Generate data for cards drawn chart
             const cardsDrawnData = useMemo(() => {
                 const data = [];
                 const pieces = comboSize === 2 ? [copiesA, copiesB] : 
                                comboSize === 3 ? [copiesA, copiesB, copiesC] :
                                [copiesA, copiesB, copiesC, copiesD];
                 
-                for (let cards = 13; cards <= 20; cards++) {
+                const startCards = Math.max(7, Math.min(cardsDrawn - 5, 7));
+                const endCards = Math.min(cardsDrawn + 7, deckSize);
+                
+                for (let cards = startCards; cards <= endCards; cards++) {
                     data.push({
                         cards,
                         probability: parseFloat((calculateComboProb(cards, pieces) * 100).toFixed(1))
                     });
                 }
                 return data;
-            }, [comboSize, copiesA, copiesB, copiesC, copiesD]);
+            }, [comboSize, copiesA, copiesB, copiesC, copiesD, cardsDrawn, deckSize]);
 
-            // Generate data for different copy combinations (removing redundant permutations)
+            // Generate data for different copy combinations
             const copyData = useMemo(() => {
                 let scenarios = [];
                 
@@ -164,77 +198,26 @@
                     ...scenario,
                     probability: (calculateComboProb(cardsDrawn, scenario.pieces) * 100).toFixed(1)
                 }));
-            }, [cardsDrawn, comboSize]);
+            }, [cardsDrawn, comboSize, deckSize]);
 
-            // Calculate mulligan scenarios
+            // Simplified mulligan analysis
             const mulliganData = useMemo(() => {
                 const pieces = comboSize === 2 ? [copiesA, copiesB] : 
                                comboSize === 3 ? [copiesA, copiesB, copiesC] :
                                [copiesA, copiesB, copiesC, copiesD];
                 
-                // Calculate probability of having combo in opening 7 cards
-                const openingProb = calculateComboProb(7, pieces) * 100;
-                
-                // Calculate expected probability with mulligan strategy
-                const calculateMulliganExpectedValue = () => {
-                    let expectedValue = 0;
-                    let remainingProbability = 1;
-                    
-                    // Check each mulligan scenario
-                    for (let mulligans = 0; mulligans <= 3; mulligans++) {
-                        const handSize = 7 - mulligans;
-                        if (handSize < 4) break; // Stop at unreasonably small hands
-                        
-                        // Probability of combo in this hand size + draws
-                        const totalCards = handSize + drawsAfterMulligan;
-                        const handProb = calculateComboProb(totalCards, pieces) * 100;
-                        
-                        if (mulligans === 0) {
-                            // First hand - keep if above threshold
-                            if (openingProb >= mulliganThreshold) {
-                                expectedValue += remainingProbability * handProb;
-                                remainingProbability = 0;
-                                break;
-                            } else {
-                                // Mulligan - probability we don't keep this hand
-                                remainingProbability *= (100 - openingProb) / 100;
-                            }
-                        } else {
-                            // Subsequent hands - simplified model
-                            if (handProb >= mulliganThreshold || mulligans === 3) {
-                                expectedValue += remainingProbability * handProb;
-                                break;
-                            } else {
-                                remainingProbability *= (100 - handProb) / 100;
-                            }
-                        }
-                    }
-                    
-                    return expectedValue;
-                };
-                
                 const scenarios = [
-                    { name: 'No Mulligan', handSize: 7, totalCards: 7 + drawsAfterMulligan },
-                    { name: '1 Mulligan', handSize: 6, totalCards: 6 + drawsAfterMulligan },
-                    { name: '2 Mulligans', handSize: 5, totalCards: 5 + drawsAfterMulligan },
-                    { name: '3 Mulligans', handSize: 4, totalCards: 4 + drawsAfterMulligan },
+                    { name: 'Opening 7', cards: 7, description: 'Keep opening hand' },
+                    { name: 'Mulligan to 6', cards: 6, description: 'Mulligan once' },
+                    { name: 'Mulligan to 5', cards: 5, description: 'Mulligan twice' },
+                    { name: 'Mulligan to 4', cards: 4, description: 'Mulligan three times' },
                 ];
                 
-                const data = scenarios.map(scenario => ({
+                return scenarios.map(scenario => ({
                     ...scenario,
-                    probability: (calculateComboProb(scenario.totalCards, pieces) * 100).toFixed(1)
+                    probability: (calculateComboProb(scenario.cards, pieces) * 100).toFixed(1)
                 }));
-                
-                // Add expected value with optimal strategy
-                data.push({
-                    name: `Optimal Strategy (${mulliganThreshold}% threshold)`,
-                    handSize: 'varies',
-                    totalCards: 'varies',
-                    probability: calculateMulliganExpectedValue().toFixed(1)
-                });
-                
-                return data;
-            }, [comboSize, copiesA, copiesB, copiesC, copiesD, mulliganThreshold, drawsAfterMulligan]);
+            }, [comboSize, copiesA, copiesB, copiesC, copiesD, deckSize]);
 
             const currentPieces = comboSize === 2 ? [copiesA, copiesB] : 
                                  comboSize === 3 ? [copiesA, copiesB, copiesC] :
@@ -244,20 +227,20 @@
             // Check if Recharts loaded properly
             if (!window.Recharts || !LineChart) {
                 return (
-                    <div className="p-6 max-w-6xl mx-auto bg-gray-50 min-h-screen">
-                        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
-                            MTG Combo Probability Calculator
+                    <div className="p-6 max-w-6xl mx-auto min-h-screen text-white">
+                        <h1 className="text-3xl font-bold mb-6 text-center glow-text">
+                            ✨ Mystical MTG Combo Calculator ✨
                         </h1>
-                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                            <strong>Loading Error:</strong> Charts library failed to load. Please refresh the page.
-                        </div>
-                        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-                            <h2 className="text-xl font-semibold mb-4">Current Scenario (Text Mode)</h2>
+                        <div className="mystical-card rounded-lg p-6 mb-6">
+                            <div className="bg-red-900 bg-opacity-50 border border-red-500 text-red-200 px-4 py-3 rounded mb-4">
+                                <strong>Loading Error:</strong> Charts library failed to load. Please refresh the page.
+                            </div>
+                            <h2 className="text-xl font-semibold mb-4 text-purple-200">Current Scenario (Text Mode)</h2>
                             <div className="text-center">
-                                <div className="text-3xl font-bold text-blue-600 mb-2">
+                                <div className="text-3xl font-bold text-purple-300 mb-2 glow-text">
                                     {(currentProb * 100).toFixed(1)}%
                                 </div>
-                                <div className="text-gray-600">
+                                <div className="text-gray-300">
                                     Probability of drawing all {comboSize} combo pieces
                                 </div>
                             </div>
@@ -267,20 +250,32 @@
             }
 
             return (
-                <div className="p-6 max-w-6xl mx-auto bg-gray-50 min-h-screen">
-                    <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
-                        MTG Combo Probability Calculator
+                <div className="p-6 max-w-6xl mx-auto min-h-screen text-white">
+                    <h1 className="text-3xl font-bold mb-6 text-center glow-text">
+                        ✨ Mystical MTG Combo Calculator ✨
                     </h1>
                     
-                    <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-                        <h2 className="text-xl font-semibold mb-4">Current Scenario</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div className="mystical-card rounded-lg p-6 mb-6">
+                        <h2 className="text-xl font-semibold mb-4 text-purple-200">🔮 Current Scenario</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
                             <div>
-                                <label className="block text-sm font-medium mb-2">Combo Size</label>
+                                <label className="block text-sm font-medium mb-2 text-purple-200">Deck Size</label>
+                                <select
+                                    value={deckSize}
+                                    onChange={(e) => setDeckSize(parseInt(e.target.value))}
+                                    className="mystical-select w-full p-2 rounded-md"
+                                >
+                                    <option value={40}>40 (Cube/Limited)</option>
+                                    <option value={60}>60 (Standard/Modern)</option>
+                                    <option value={100}>100 (Commander)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-2 text-purple-200">Combo Size</label>
                                 <select
                                     value={comboSize}
                                     onChange={(e) => setComboSize(parseInt(e.target.value))}
-                                    className="w-full p-2 border rounded-md"
+                                    className="mystical-select w-full p-2 rounded-md"
                                 >
                                     <option value={2}>2 Cards</option>
                                     <option value={3}>3 Cards</option>
@@ -288,36 +283,36 @@
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-2">Cards Drawn</label>
+                                <label className="block text-sm font-medium mb-2 text-purple-200">Cards Drawn</label>
                                 <input
                                     type="number"
                                     value={cardsDrawn}
                                     onChange={(e) => setCardsDrawn(parseInt(e.target.value) || 13)}
                                     min="1"
-                                    max="40"
-                                    className="w-full p-2 border rounded-md"
+                                    max={deckSize}
+                                    className="mystical-input w-full p-2 rounded-md"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-2">Copies of Piece A</label>
+                                <label className="block text-sm font-medium mb-2 text-purple-200">Copies of Piece A</label>
                                 <input
                                     type="number"
                                     value={copiesA}
                                     onChange={(e) => setCopiesA(parseInt(e.target.value) || 1)}
                                     min="1"
                                     max="10"
-                                    className="w-full p-2 border rounded-md"
+                                    className="mystical-input w-full p-2 rounded-md"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-2">Copies of Piece B</label>
+                                <label className="block text-sm font-medium mb-2 text-purple-200">Copies of Piece B</label>
                                 <input
                                     type="number"
                                     value={copiesB}
                                     onChange={(e) => setCopiesB(parseInt(e.target.value) || 1)}
                                     min="1"
                                     max="10"
-                                    className="w-full p-2 border rounded-md"
+                                    className="mystical-input w-full p-2 rounded-md"
                                 />
                             </div>
                         </div>
@@ -325,26 +320,26 @@
                         {comboSize >= 3 && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                 <div>
-                                    <label className="block text-sm font-medium mb-2">Copies of Piece C</label>
+                                    <label className="block text-sm font-medium mb-2 text-purple-200">Copies of Piece C</label>
                                     <input
                                         type="number"
                                         value={copiesC}
                                         onChange={(e) => setCopiesC(parseInt(e.target.value) || 1)}
                                         min="1"
                                         max="10"
-                                        className="w-full p-2 border rounded-md"
+                                        className="mystical-input w-full p-2 rounded-md"
                                     />
                                 </div>
                                 {comboSize >= 4 && (
                                     <div>
-                                        <label className="block text-sm font-medium mb-2">Copies of Piece D</label>
+                                        <label className="block text-sm font-medium mb-2 text-purple-200">Copies of Piece D</label>
                                         <input
                                             type="number"
                                             value={copiesD}
                                             onChange={(e) => setCopiesD(parseInt(e.target.value) || 1)}
                                             min="1"
                                             max="10"
-                                            className="w-full p-2 border rounded-md"
+                                            className="mystical-input w-full p-2 rounded-md"
                                         />
                                     </div>
                                 )}
@@ -352,28 +347,45 @@
                         )}
                         
                         <div className="text-center">
-                            <div className="text-3xl font-bold text-blue-600 mb-2">
+                            <div className="text-4xl font-bold text-purple-300 mb-2 glow-text">
                                 {(currentProb * 100).toFixed(1)}%
                             </div>
-                            <div className="text-gray-600">
-                                Probability of drawing all {comboSize} combo pieces
+                            <div className="text-gray-300">
+                                Probability of drawing all {comboSize} combo pieces in a {deckSize}-card deck
                             </div>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white rounded-lg shadow-lg p-6">
-                            <h2 className="text-xl font-semibold mb-4">Probability vs Cards Drawn</h2>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={cardsDrawnData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="cards" />
-                                    <YAxis label={{ value: 'Probability (%)', angle: -90, position: 'insideLeft' }} />
-                                    <Tooltip formatter={(value) => [`${value}%`, 'Probability']} />
-                                    <Line type="monotone" dataKey="probability" stroke="#2563eb" strokeWidth={3} />
-                                </LineChart>
-                            </ResponsiveContainer>
-                            <p className="text-sm text-gray-600 mt-2">
+                        <div className="mystical-card rounded-lg p-6">
+                            <h2 className="text-xl font-semibold mb-4 text-purple-200">📈 Probability vs Cards Drawn</h2>
+                            <div className="chart-container">
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <LineChart data={cardsDrawnData}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.2)" />
+                                        <XAxis dataKey="cards" stroke="#e2e8f0" />
+                                        <YAxis label={{ value: 'Probability (%)', angle: -90, position: 'insideLeft' }} stroke="#e2e8f0" />
+                                        <Tooltip 
+                                            formatter={(value) => [`${value}%`, 'Probability']}
+                                            contentStyle={{
+                                                backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                                                border: '1px solid rgba(139, 92, 246, 0.4)',
+                                                borderRadius: '8px',
+                                                color: '#e2e8f0'
+                                            }}
+                                        />
+                                        <Line 
+                                            type="monotone" 
+                                            dataKey="probability" 
+                                            stroke="#a855f7" 
+                                            strokeWidth={3}
+                                            dot={{ fill: '#a855f7', strokeWidth: 2, r: 4 }}
+                                            activeDot={{ r: 6, fill: '#c084fc' }}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <p className="text-sm text-gray-400 mt-2">
                                 Shows how probability changes as you see more cards (current: {
                                     comboSize === 2 ? `${copiesA}+${copiesB}` :
                                     comboSize === 3 ? `${copiesA}+${copiesB}+${copiesC}` :
@@ -382,87 +394,70 @@
                             </p>
                         </div>
 
-                        <div className="bg-white rounded-lg shadow-lg p-6">
-                            <h2 className="text-xl font-semibold mb-4">Probability vs Copy Count</h2>
+                        <div className="mystical-card rounded-lg p-6">
+                            <h2 className="text-xl font-semibold mb-4 text-purple-200">📊 Probability vs Copy Count</h2>
                             <div className="grid grid-cols-3 gap-2 text-sm">
-                                <div className="font-semibold">Copies</div>
-                                <div className="font-semibold">Probability</div>
-                                <div className="font-semibold">Improvement</div>
+                                <div className="font-semibold text-purple-200">Copies</div>
+                                <div className="font-semibold text-purple-200">Probability</div>
+                                <div className="font-semibold text-purple-200">Improvement</div>
                                 {copyData.map((item, index) => (
                                     <React.Fragment key={item.name}>
-                                        <div className={JSON.stringify(item.pieces) === JSON.stringify(currentPieces) ? 'font-bold text-blue-600' : ''}>
+                                        <div className={JSON.stringify(item.pieces) === JSON.stringify(currentPieces) ? 'font-bold text-purple-300 glow-text' : 'text-gray-300'}>
                                             {item.name}
                                         </div>
-                                        <div className={JSON.stringify(item.pieces) === JSON.stringify(currentPieces) ? 'font-bold text-blue-600' : ''}>
+                                        <div className={JSON.stringify(item.pieces) === JSON.stringify(currentPieces) ? 'font-bold text-purple-300 glow-text' : 'text-gray-300'}>
                                             {item.probability}%
                                         </div>
-                                        <div className="text-gray-600">
+                                        <div className="text-gray-400">
                                             {index > 0 ? `+${(parseFloat(item.probability) - parseFloat(copyData[0].probability)).toFixed(1)}%` : '—'}
                                         </div>
                                     </React.Fragment>
                                 ))}
                             </div>
-                            <p className="text-sm text-gray-600 mt-2">
+                            <p className="text-sm text-gray-400 mt-2">
                                 Shows how additional functional copies improve your odds (at {cardsDrawn} cards drawn)
                             </p>
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
-                        <h2 className="text-xl font-semibold mb-4">Mulligan Analysis</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-2">Mulligan Threshold (%)</label>
-                                <input
-                                    type="number"
-                                    value={mulliganThreshold}
-                                    onChange={(e) => setMulliganThreshold(parseInt(e.target.value) || 20)}
-                                    min="0"
-                                    max="100"
-                                    className="w-full p-2 border rounded-md"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Mulligan if combo probability is below this %</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-2">Cards Drawn After Mulligan</label>
-                                <input
-                                    type="number"
-                                    value={drawsAfterMulligan}
-                                    onChange={(e) => setDrawsAfterMulligan(parseInt(e.target.value) || 6)}
-                                    min="0"
-                                    max="15"
-                                    className="w-full p-2 border rounded-md"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Additional cards drawn after keeping a hand</p>
-                            </div>
-                        </div>
+                    <div className="mystical-card rounded-lg p-6 mt-6">
+                        <h2 className="text-xl font-semibold mb-4 text-purple-200">🎯 Mulligan Decision Guide</h2>
+                        <p className="text-sm text-gray-400 mb-4">
+                            This shows your combo probability in different opening hand scenarios. 
+                            Use this to decide how aggressively to mulligan for your combo.
+                        </p>
                         
-                        <div className="grid grid-cols-4 gap-2 text-sm">
-                            <div className="font-semibold">Scenario</div>
-                            <div className="font-semibold">Hand Size</div>
-                            <div className="font-semibold">Total Cards</div>
-                            <div className="font-semibold">Probability</div>
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                            <div className="font-semibold text-purple-200">Scenario</div>
+                            <div className="font-semibold text-purple-200">Hand Size</div>
+                            <div className="font-semibold text-purple-200">Combo Probability</div>
                             {mulliganData.map((item, index) => (
                                 <React.Fragment key={item.name}>
-                                    <div className={index === mulliganData.length - 1 ? 'font-bold text-blue-600' : ''}>
+                                    <div className="text-gray-300">
                                         {item.name}
                                     </div>
-                                    <div className={index === mulliganData.length - 1 ? 'font-bold text-blue-600' : ''}>
-                                        {item.handSize}
+                                    <div className="text-gray-300">
+                                        {item.cards} cards
                                     </div>
-                                    <div className={index === mulliganData.length - 1 ? 'font-bold text-blue-600' : ''}>
-                                        {item.totalCards}
-                                    </div>
-                                    <div className={index === mulliganData.length - 1 ? 'font-bold text-blue-600' : ''}>
+                                    <div className={`${parseFloat(item.probability) >= 30 ? 'text-green-400' : 
+                                                     parseFloat(item.probability) >= 15 ? 'text-yellow-400' : 
+                                                     'text-red-400'} font-semibold`}>
                                         {item.probability}%
                                     </div>
                                 </React.Fragment>
                             ))}
                         </div>
-                        <p className="text-xs text-gray-600 mt-2">
-                            * Opening 7 probability: {(calculateComboProb(7, currentPieces) * 100).toFixed(1)}%. 
-                            Optimal strategy accounts for mulligan decisions based on your threshold.
-                        </p>
+                        <div className="mt-4 text-xs text-gray-400">
+                            <div className="grid grid-cols-3 gap-4">
+                                <div><span className="text-green-400">●</span> High probability (30%+)</div>
+                                <div><span className="text-yellow-400">●</span> Medium probability (15-29%)</div>
+                                <div><span className="text-red-400">●</span> Low probability (&lt;15%)</div>
+                            </div>
+                            <p className="mt-2">
+                                Generally, mulligan aggressively if your combo probability is very low, 
+                                but consider keeping hands with medium probability depending on your deck's backup plans.
+                            </p>
+                        </div>
                     </div>
                 </div>
             );
